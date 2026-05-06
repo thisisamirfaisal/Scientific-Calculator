@@ -1,0 +1,236 @@
+# 🚀 Deployment Guide
+
+## Files Overview
+
+| File | Purpose |
+|---|---|
+| `app.py` | Full Streamlit scientific calculator application |
+| `requirements.txt` | Python dependencies |
+| `README.md` | Hugging Face Spaces metadata + documentation |
+| `colab_runner.py` | Cell-by-cell Google Colab setup instructions |
+
+---
+
+## 1 · Run Locally
+
+```bash
+# Clone / download the files, then:
+pip install -r requirements.txt
+streamlit run app.py
+# Opens at http://localhost:8501
+```
+
+---
+
+## 2 · Google Colab — Step-by-Step
+
+Open a new Colab notebook at https://colab.research.google.com and paste each
+block below into a **separate code cell**, then run them in order.
+
+### Cell 1 — Install packages
+
+```python
+!pip install -q streamlit pyngrok
+```
+
+### Cell 2 — Write app.py
+
+```python
+# Download app.py from your HF Space after uploading, or paste the full
+# contents of app.py into a Python string and write it to disk:
+
+app_code = open("app.py").read()   # if you uploaded via Colab Files panel
+# --- OR ---
+# !wget -q "https://huggingface.co/spaces/YOUR_USER/YOUR_SPACE/raw/main/app.py"
+print("app.py ready ✅")
+```
+
+> **Tip — upload via Files panel**: In Colab, click the 📁 icon in the
+> left sidebar → "Upload to session storage" → select `app.py`.
+
+### Cell 3 — Start the app + expose with ngrok
+
+```python
+import subprocess, threading, time
+from pyngrok import ngrok, conf
+
+# 1. Get a free token at https://ngrok.com → Dashboard → Your Authtoken
+NGROK_TOKEN = "PASTE_YOUR_NGROK_AUTHTOKEN_HERE"
+conf.get_default().auth_token = NGROK_TOKEN
+
+# 2. Start Streamlit in the background
+def _run():
+    subprocess.run([
+        "streamlit", "run", "app.py",
+        "--server.port", "8501",
+        "--server.headless", "true",
+        "--server.enableCORS", "false",
+        "--server.enableXsrfProtection", "false",
+    ])
+
+threading.Thread(target=_run, daemon=True).start()
+time.sleep(5)   # wait for boot
+
+# 3. Open a public tunnel
+url = ngrok.connect(8501)
+print(f"\n🚀  Live at: {url}\n")
+```
+
+### Cell 4 — (No-account alternative) localtunnel
+
+```python
+import subprocess, threading, time, re
+
+def _run():
+    subprocess.run([
+        "streamlit", "run", "app.py",
+        "--server.port", "8501",
+        "--server.headless", "true",
+    ])
+
+threading.Thread(target=_run, daemon=True).start()
+time.sleep(5)
+
+!npm install -g localtunnel -q
+proc = subprocess.Popen(["lt", "--port", "8501"], stdout=subprocess.PIPE)
+time.sleep(3)
+line = proc.stdout.readline().decode()
+match = re.search(r"https://[^\s]+", line)
+print(f"🌐  URL: {match.group(0)}" if match else "Could not get URL")
+# Note: localtunnel landing page asks for your IP — run: !curl -s ifconfig.me
+```
+
+### Cell 5 — Teardown
+
+```python
+from pyngrok import ngrok
+ngrok.disconnect_all(); ngrok.kill()
+print("Tunnels closed.")
+```
+
+---
+
+## 3 · Hugging Face Spaces — Step-by-Step
+
+### Prerequisites
+- A free account at https://huggingface.co
+
+### Steps
+
+**Step 1 — Create a new Space**
+
+1. Go to https://huggingface.co/new-space
+2. Set **Space name** (e.g. `scientific-calculator`)
+3. Choose **SDK → Streamlit**
+4. Set visibility to **Public**
+5. Click **Create Space**
+
+**Step 2 — Upload files**
+
+Upload all three files via the HF web UI (Files tab → Add file → Upload files):
+
+```
+app.py
+requirements.txt
+README.md          ← must have the YAML front-matter shown below
+```
+
+Or use the `huggingface_hub` Python library:
+
+```python
+from huggingface_hub import HfApi
+
+api = HfApi()
+repo_id = "YOUR_HF_USERNAME/scientific-calculator"
+
+for fname in ["app.py", "requirements.txt", "README.md"]:
+    api.upload_file(
+        path_or_fileobj=fname,
+        path_in_repo=fname,
+        repo_id=repo_id,
+        repo_type="space",
+        token="hf_YOUR_WRITE_TOKEN",   # Settings → Access Tokens
+    )
+print("Upload complete ✅")
+```
+
+**Step 3 — Verify README.md YAML front-matter**
+
+Your `README.md` must start with exactly this block (already included
+in the provided `README.md`):
+
+```yaml
+---
+title: Scientific Calculator
+emoji: 🧮
+colorFrom: blue
+colorTo: cyan
+sdk: streamlit
+sdk_version: 1.35.0
+app_file: app.py
+pinned: false
+license: mit
+short_description: Advanced dark-themed scientific calculator
+---
+```
+
+**Step 4 — Watch the build**
+
+- HF Spaces detects the push, installs `requirements.txt`, and runs
+  `streamlit run app.py` automatically.
+- Build logs appear under the **Logs** tab (usually < 2 min).
+- When the badge turns **Running**, your app is live at:
+
+```
+https://huggingface.co/spaces/YOUR_HF_USERNAME/scientific-calculator
+```
+
+**Step 5 — Share**
+
+- The public URL works in any browser, no login required.
+- Embed it with an `<iframe>` or share the direct link.
+
+---
+
+## Calculator Usage Guide
+
+| Input example | Meaning |
+|---|---|
+| `sin(30)` | sin of 30° (or 30 rad if RAD mode is on) |
+| `asin(0.5)` | inverse sin → 30 (in DEG mode) |
+| `log(1000)` | log base-10 → 3 |
+| `ln(e)` | natural log → 1 |
+| `sqrt(2)` | √2 ≈ 1.4142 |
+| `cbrt(27)` | ∛27 = 3 |
+| `nrt(4, 16)` | 4th root of 16 = 2 |
+| `5!` | factorial(5) = 120 |
+| `2^10` | 2¹⁰ = 1024 |
+| `abs(-7)` | 7 |
+| `floor(3.9)` | 3 |
+| `ceil(3.1)` | 4 |
+| `pi` | 3.14159… |
+| `phi` | 1.61803… (golden ratio) |
+
+---
+
+## Architecture Notes
+
+```
+app.py
+├── inject_css()         — custom dark theme styles
+├── init_state()         — session-state bootstrap
+├── append_to_expr()     — expression builder
+├── evaluate_expression()— safe eval with sandboxed namespace
+│   ├── _preprocess()    — × → *, ! → factorial(), etc.
+│   ├── _build_safe_namespace() — whitelisted math functions
+│   └── _to_rad/_from_rad       — angle mode conversion
+├── memory_*()           — M+, M−, MR, MC
+├── render_display()     — expression + result panel
+├── render_badges()      — angle mode + memory indicator
+├── render_*_row()       — modular button row renderers
+└── main()               — wires everything together
+```
+
+The evaluator uses Python's `eval()` with a **completely locked-down
+namespace** (`__builtins__: {}`), whitelisting only the explicit set of
+math functions — making it safe against code injection.
